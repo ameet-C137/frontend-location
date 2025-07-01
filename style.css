@@ -1,0 +1,40 @@
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(to bottom right, #92fe9d, #00c9ff);
+  color: #222;
+}
+
+.container {
+  margin: 20px auto;
+  padding: 20px;
+  background: #ffffffcc;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0,0,0,0.2);
+  width: fit-content;
+}
+
+button {
+  margin: 10px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background: #0077ff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #005fcc;
+}
+
+#map {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 600px;
+  height: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
