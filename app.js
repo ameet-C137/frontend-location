@@ -39,29 +39,36 @@ async function generateKeys() {
 function startQRScanner() {
   const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
   scanner.render(async function(decodedText) {
-    sessionId = decodedText;
-    scanner.clear();
-    const res = await fetch(`${BACKEND_URL}/get-key/${sessionId}`);
-    const { key } = await res.json();
+    try {
+      sessionId = decodedText;
+      scanner.clear();
 
-    const publicKeyRaw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
-    const publicKey = await crypto.subtle.importKey(
-      "raw",
-      publicKeyRaw,
-      { name: "ECDH", namedCurve: "P-256" },
-      true,
-      []
-    );
+      const res = await fetch(`${BACKEND_URL}/get-key/${sessionId}`);
+      if (!res.ok) throw new Error("Session not found or already used.");
 
-    sharedKey = await crypto.subtle.deriveKey(
-      { name: "ECDH", public: publicKey },
-      keyPair.privateKey,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
+      const { key } = await res.json();
 
-    alert("Connected to peer!");
+      const publicKeyRaw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+      const publicKey = await crypto.subtle.importKey(
+        "raw",
+        publicKeyRaw,
+        { name: "ECDH", namedCurve: "P-256" },
+        true,
+        []
+      );
+
+      sharedKey = await crypto.subtle.deriveKey(
+        { name: "ECDH", public: publicKey },
+        keyPair.privateKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+
+      alert("Connected to peer!");
+    } catch (err) {
+      alert("Failed to connect: " + err.message);
+    }
   });
 }
 
