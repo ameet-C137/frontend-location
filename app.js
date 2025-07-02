@@ -9,6 +9,12 @@ const WS_URL = BACKEND_URL.replace("https", "wss");
 
 initMap();
 
+// ✅ Immediately prompt for location permission
+navigator.geolocation.getCurrentPosition(
+  () => console.log("Location permission granted."),
+  err => alert("Location permission denied. Enable it for this app to work.")
+);
+
 function initMap() {
   map = L.map('map').setView([0, 0], 2);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -18,8 +24,7 @@ async function generateKeys() {
   username = username || prompt("Enter your username:");
   keyPair = await window.crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
-    true,
-    ["deriveKey"]
+    true, ["deriveKey"]
   );
   const pubRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
   const b64 = btoa(String.fromCharCode(...new Uint8Array(pubRaw)));
@@ -54,8 +59,7 @@ function startQRScanner() {
       const raw = Uint8Array.from(atob(key), c=>c.charCodeAt(0));
       const publicKey = await crypto.subtle.importKey("raw", raw, { name:"ECDH",namedCurve:"P-256" },true,[]);
       sharedKey = await crypto.subtle.deriveKey({ name:"ECDH", public:publicKey }, keyPair.privateKey, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
-      peerName = prompt("Enter peer's username:");
-      alert(`Connected to ${peerName}`);
+      alert("Connected. Now click 'Start Sharing'.");
     } catch(e) {
       alert("Failed to connect: " + e.message);
     }
@@ -69,8 +73,8 @@ function startSharing() {
   ws.onopen = () => {
     navigator.geolocation.watchPosition(
       pos => {
-        const coords = { lat: pos.coords.latitude, lon:pos.coords.longitude };
-        ws.send(JSON.stringify({ type:"location", coords, username }));
+        const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        ws.send(JSON.stringify({ type: "location", coords, username }));
         updateUserMarker(coords, username);
       },
       err => {
@@ -88,6 +92,7 @@ function startSharing() {
       peerName = d.username;
       updatePeerMarker(peerCoords, peerName);
       drawRoute();
+      alert(`Connected to ${peerName}`);
     }
   };
 }
