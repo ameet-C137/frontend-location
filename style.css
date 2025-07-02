@@ -1,18 +1,28 @@
-body {
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
   font-family: Arial, sans-serif;
-  text-align: center;
-  padding: 20px;
   background: linear-gradient(to bottom right, #92fe9d, #00c9ff);
-  color: #222;
 }
 
 .container {
-  margin: 20px auto;
   padding: 20px;
+  max-width: 700px;
+  margin: auto;
+  text-align: center;
+}
+
+h1 {
+  color: #222;
+}
+
+.controls {
   background: #ffffffcc;
+  padding: 20px;
   border-radius: 12px;
   box-shadow: 0 0 12px rgba(0,0,0,0.2);
-  width: fit-content;
+  margin-bottom: 20px;
 }
 
 button {
@@ -31,10 +41,9 @@ button:hover {
 }
 
 #map {
-  margin-top: 20px;
   width: 100%;
-  max-width: 600px;
   height: 400px;
-  margin-left: auto;
-  margin-right: auto;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 10px;
 }
