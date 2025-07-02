@@ -9,7 +9,6 @@ const WS_URL = BACKEND_URL.replace("https", "wss");
 
 initMap();
 
-// Ask for location permission early
 navigator.geolocation.getCurrentPosition(
   () => console.log("Location access OK"),
   err => alert("Location permission denied. Please enable it.")
@@ -22,15 +21,11 @@ function initMap() {
 
 async function generateKeys() {
   document.getElementById("loading").style.display = "block";
-  username = username || prompt("Enter your username:");
-
   keyPair = await window.crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "P-256" },
-    true, ["deriveKey"]
+    { name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]
   );
   const pubRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
   const b64 = btoa(String.fromCharCode(...new Uint8Array(pubRaw)));
-
   const res = await fetch(`${BACKEND_URL}/create-session`, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
@@ -46,7 +41,6 @@ async function generateKeys() {
 
 function startQRScanner() {
   document.getElementById("loading").style.display = "block";
-  username = username || prompt("Enter your username:");
   const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
   scanner.render(async decodedText => {
     scanner.clear();
@@ -83,18 +77,27 @@ function startSharing() {
   const ws = new WebSocket(`${WS_URL}/ws/${sessionId}`);
 
   ws.onopen = () => {
-    navigator.geolocation.watchPosition(
-      pos => {
-        const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        ws.send(JSON.stringify({ type: "location", coords, username }));
-        updateUserMarker(coords, username);
-      },
-      err => {
-        console.error("Geolocation error:", err);
-        alert("Error fetching location: " + err.message);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    console.log("WebSocket connected.");
+
+    const geoSuccess = pos => {
+      const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      console.log("Sending location:", coords);
+      ws.send(JSON.stringify({ type: "location", coords, username }));
+      updateUserMarker(coords, username);
+    };
+
+    const geoError = err => {
+      console.error("Geolocation error:", err);
+      alert("Unable to access your location: " + err.message);
+    };
+
+    navigator.geolocation.getCurrentPosition(geoSuccess, geoError, { enableHighAccuracy: true });
+
+    navigator.geolocation.watchPosition(geoSuccess, geoError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    });
   };
 
   ws.onmessage = ev => {
