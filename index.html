@@ -9,15 +9,17 @@
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
-  <h1>Secure Location Sharing</h1>
   <div class="container">
-    <button onclick="generateKeys()">Generate Key & Show QR</button>
-    <button onclick="startQRScanner()">Scan Peer QR</button>
-    <button onclick="startSharing()">Start Sharing</button>
+    <h1>Secure Location Sharing</h1>
+    <div class="controls">
+      <button onclick="generateKeys()">Generate Key & Show QR</button>
+      <button onclick="startQRScanner()">Scan Peer QR</button>
+      <button onclick="startSharing()">Start Sharing</button>
+    </div>
+    <div id="qr"></div>
+    <div id="reader" style="width: 300px; margin: auto;"></div>
+    <div id="map"></div>
   </div>
-  <div id="qr"></div>
-  <div id="reader" style="width: 300px; margin: auto;"></div>
-  <div id="map" style="height: 400px; max-width: 600px; margin: auto;"></div>
   <script src="app.js"></script>
 </body>
 </html>
