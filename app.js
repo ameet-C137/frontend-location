@@ -38,10 +38,20 @@ async function generateKeys() {
 
 function startQRScanner() {
   const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+
   scanner.render(async function(decodedText) {
     try {
       sessionId = decodedText;
       scanner.clear();
+
+      // ✅ Ensure local keyPair is generated before deriving
+      if (!keyPair) {
+        keyPair = await window.crypto.subtle.generateKey(
+          { name: "ECDH", namedCurve: "P-256" },
+          true,
+          ["deriveKey"]
+        );
+      }
 
       const res = await fetch(`${BACKEND_URL}/get-key/${sessionId}`);
       if (!res.ok) throw new Error("Session not found or already used.");
