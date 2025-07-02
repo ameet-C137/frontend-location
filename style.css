@@ -47,3 +47,8 @@ button:hover {
   overflow: hidden;
   margin-top: 10px;
 }
+
+#loading {
+  text-align: center;
+  margin: 10px;
+}
