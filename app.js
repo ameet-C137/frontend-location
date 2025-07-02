@@ -9,10 +9,10 @@ const WS_URL = BACKEND_URL.replace("https", "wss");
 
 initMap();
 
-// ✅ Immediately prompt for location permission
+// Ask for location permission early
 navigator.geolocation.getCurrentPosition(
-  () => console.log("Location permission granted."),
-  err => alert("Location permission denied. Enable it for this app to work.")
+  () => console.log("Location access OK"),
+  err => alert("Location permission denied. Please enable it.")
 );
 
 function initMap() {
@@ -21,13 +21,16 @@ function initMap() {
 }
 
 async function generateKeys() {
+  document.getElementById("loading").style.display = "block";
   username = username || prompt("Enter your username:");
+
   keyPair = await window.crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
     true, ["deriveKey"]
   );
   const pubRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
   const b64 = btoa(String.fromCharCode(...new Uint8Array(pubRaw)));
+
   const res = await fetch(`${BACKEND_URL}/create-session`, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
@@ -35,35 +38,44 @@ async function generateKeys() {
   });
   const { session } = await res.json();
   sessionId = session;
+  document.getElementById("loading").style.display = "none";
   document.getElementById("qr").innerHTML = `
     <img src="https://api.qrserver.com/v1/create-qr-code/?data=${sessionId}" />
     <p>Scan this QR (one-time use)</p>`;
 }
 
 function startQRScanner() {
+  document.getElementById("loading").style.display = "block";
   username = username || prompt("Enter your username:");
   const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
   scanner.render(async decodedText => {
     scanner.clear();
+    document.getElementById("loading").style.display = "none";
     sessionId = decodedText;
+
     if (!keyPair) {
       keyPair = await window.crypto.subtle.generateKey(
         { name: "ECDH", namedCurve: "P-256" },
         true, ["deriveKey"]
       );
     }
+
     try {
       const res = await fetch(`${BACKEND_URL}/get-key/${sessionId}`);
       if (!res.ok) throw new Error((await res.json()).error);
       const { key } = await res.json();
-      const raw = Uint8Array.from(atob(key), c=>c.charCodeAt(0));
-      const publicKey = await crypto.subtle.importKey("raw", raw, { name:"ECDH",namedCurve:"P-256" },true,[]);
-      sharedKey = await crypto.subtle.deriveKey({ name:"ECDH", public:publicKey }, keyPair.privateKey, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
+      const raw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+      const publicKey = await crypto.subtle.importKey("raw", raw, { name:"ECDH",namedCurve:"P-256" }, true, []);
+      sharedKey = await crypto.subtle.deriveKey({ name:"ECDH", public: publicKey }, keyPair.privateKey, { name:"AES-GCM", length: 256 }, false, ["encrypt","decrypt"]);
       alert("Connected. Now click 'Start Sharing'.");
     } catch(e) {
       alert("Failed to connect: " + e.message);
     }
   });
+
+  setTimeout(() => {
+    document.getElementById("loading").style.display = "none";
+  }, 1000);
 }
 
 function startSharing() {
@@ -79,7 +91,7 @@ function startSharing() {
       },
       err => {
         console.error("Geolocation error:", err);
-        alert("Error fetching your location: " + err.message);
+        alert("Error fetching location: " + err.message);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -103,7 +115,7 @@ function updateUserMarker(coords, name) {
     .addTo(map)
     .bindPopup(name || "You")
     .openPopup();
-  map.setView([coords.lat, coords.lon], 13);
+  map.setView([coords.lat, coords.lon], 15);
 }
 
 function updatePeerMarker(coords, name) {
@@ -116,10 +128,14 @@ function updatePeerMarker(coords, name) {
 
 function drawRoute() {
   if (!peerCoords || !userMarker) return;
-  const u = userMarker.getLatLng(), p=[peerCoords.lat,peerCoords.lon];
+  const u = userMarker.getLatLng();
+  const p = [peerCoords.lat, peerCoords.lon];
   fetch(`https://router.project-osrm.org/route/v1/driving/${u.lng},${u.lat};${p[1]},${p[0]}?overview=full&geometries=geojson`)
-    .then(r=>r.json()).then(d=>{
-      d.routes?.[0]?.geometry && (routeLine && map.removeLayer(routeLine),
-      routeLine = L.geoJSON(d.routes[0].geometry,{style:{color:'blue'}}).addTo(map));
+    .then(r => r.json())
+    .then(d => {
+      if (routeLine) map.removeLayer(routeLine);
+      if (d.routes?.[0]?.geometry) {
+        routeLine = L.geoJSON(d.routes[0].geometry, { style: { color: 'blue' } }).addTo(map);
+      }
     });
 }
