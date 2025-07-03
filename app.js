@@ -4,7 +4,7 @@ let peerCoords = null;
 let username = prompt("Enter your username:");
 let peerName = "";
 
-const BACKEND_URL = "https://your-render-backend.onrender.com"; // Replace with your backend
+const BACKEND_URL = "https://your-backend.onrender.com"; // Replace with your backend
 const WS_URL = BACKEND_URL.replace("https", "wss");
 
 initMap();
