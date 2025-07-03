@@ -4,7 +4,7 @@ let peerCoords = null;
 let username = prompt("Enter your username:");
 let peerName = "";
 
-const BACKEND_URL = "https://your-backend.onrender.com"; // Replace with your backend
+const BACKEND_URL = "https://backend-location-bnpl.onrender.com";
 const WS_URL = BACKEND_URL.replace("https", "wss");
 
 initMap();
@@ -15,35 +15,41 @@ function initMap() {
 }
 
 async function generateKeys() {
-  document.getElementById("loading").style.display = "block";
+  try {
+    keyPair = await crypto.subtle.generateKey(
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveKey"]
+    );
 
-  keyPair = await crypto.subtle.generateKey(
-    { name: "ECDH", namedCurve: "P-256" },
-    true,
-    ["deriveKey"]
-  );
+    const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
 
-  const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
-  const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
+    const res = await fetch(`${BACKEND_URL}/create-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: b64 }),
+    });
 
-  const res = await fetch(`${BACKEND_URL}/create-session`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: b64 }),
-  });
+    if (!res.ok) {
+      alert("❌ Failed to create session. Please check your backend.");
+      return;
+    }
 
-  const data = await res.json();
-  sessionId = data.session;
+    const data = await res.json();
+    sessionId = data.session;
 
-  document.getElementById("loading").style.display = "none";
-  document.getElementById("qr").innerHTML = `
-    <img src="https://api.qrserver.com/v1/create-qr-code/?data=${sessionId}&size=150x150" />
-    <p>Scan this QR (one-time use)</p>
-  `;
+    document.getElementById("qr").innerHTML = `
+      <img src="https://api.qrserver.com/v1/create-qr-code/?data=${sessionId}&size=150x150" />
+      <p>Scan this QR (one-time use)</p>
+    `;
+  } catch (err) {
+    alert("Error generating QR: " + err.message);
+    console.error(err);
+  }
 }
 
 function startQRScanner() {
-  document.getElementById("loading").style.display = "block";
   const reader = new Html5Qrcode("reader");
   let scanned = false;
 
@@ -55,7 +61,6 @@ function startQRScanner() {
       scanned = true;
       sessionId = session;
       reader.stop();
-      document.getElementById("loading").style.display = "none";
 
       if (!keyPair) {
         keyPair = await crypto.subtle.generateKey(
