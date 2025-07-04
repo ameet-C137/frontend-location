@@ -76,6 +76,10 @@ function startQRScanner() {
       const publicKey = await crypto.subtle.importKey("raw", raw, { name: "ECDH", namedCurve: "P-256" }, true, []);
       sharedKey = await crypto.subtle.deriveKey({ name: "ECDH", public: publicKey }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
       alert("Key exchange complete. Click Start Sharing.");
+    },
+    (err) => {
+      console.error("QR scan error:", err);
+      alert("Error scanning QR: " + err);
     }
   );
 }
@@ -89,6 +93,7 @@ function startSharing() {
       const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
       ws.send(JSON.stringify({ type: "location", coords, username }));
       updateUserMarker(coords, username);
+      updateMapView();
     }, err => {
       alert("Location access denied or error: " + err.message);
     }, {
@@ -99,13 +104,39 @@ function startSharing() {
   };
 
   ws.onmessage = ev => {
-    const d = JSON.parse(ev.data);
-    if (d.type === "location") {
-      peerCoords = d.coords;
-      peerName = d.username;
-      updatePeerMarker(peerCoords, peerName);
-      drawRoute();
-      alert(`Connected to ${peerName}`);
+    try {
+      const d = JSON.parse(ev.data);
+      if (d.type === "location") {
+        peerCoords = d.coords;
+        peerName = d.username;
+        updatePeerMarker(peerCoords, peerName);
+        updateMapView();
+        drawRoute();
+        if (!peerMarker) {
+          alert(`Connected to ${peerName}`);
+        }
+      }
+    } catch (err) {
+      console.error("WebSocket message error:", err);
+    }
+  };
+
+  ws.onerror = err => {
+    console.error("WebSocket error:", err);
+    alert("WebSocket connection error. Please try again.");
+  };
+
+  ws.onclose = () => {
+    console.log("WebSocket closed");
+    alert("Connection to peer lost.");
+    if (peerMarker) {
+      map.removeLayer(peerMarker);
+      peerMarker = null;
+      peerCoords = null;
+    }
+    if (routeLine) {
+      map.removeLayer(routeLine);
+      routeLine = null;
     }
   };
 }
@@ -116,7 +147,6 @@ function updateUserMarker(coords, name) {
     .addTo(map)
     .bindPopup(name || "You")
     .openPopup();
-  map.setView([coords.lat, coords.lon], 15);
 }
 
 function updatePeerMarker(coords, name) {
@@ -125,6 +155,17 @@ function updatePeerMarker(coords, name) {
     .addTo(map)
     .bindPopup(name || "Peer")
     .openPopup();
+}
+
+function updateMapView() {
+  if (userMarker && peerMarker) {
+    const userLatLng = userMarker.getLatLng();
+    const peerLatLng = peerMarker.getLatLng();
+    const bounds = L.latLngBounds([userLatLng, peerLatLng]);
+    map.fitBounds(bounds, { padding: [50, 50] });
+  } else if (userMarker) {
+    map.setView(userMarker.getLatLng(), 15);
+  }
 }
 
 function drawRoute() {
@@ -138,5 +179,8 @@ function drawRoute() {
       if (d.routes?.[0]?.geometry) {
         routeLine = L.geoJSON(d.routes[0].geometry, { style: { color: 'blue' } }).addTo(map);
       }
+    })
+    .catch(err => {
+      console.error("Route fetch error:", err);
     });
 }
