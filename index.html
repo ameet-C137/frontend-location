@@ -2,25 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Live Location Share</title>
+  <title>Secure Location Share</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>🔐 Secure Location Share</h1>
-    <div class="controls">
-      <button onclick="generateKeys()">Generate QR</button>
-      <button onclick="startQRScanner()">Scan QR</button>
-      <input type="file" accept="image/*" onchange="scanUploadedFile(this)" />
-      <button onclick="startSharing()">Share My Location</button>
-    </div>
-    <div id="qr"></div>
-    <div id="reader"></div>
-    <div id="map"></div>
-  </div>
+  <header>
+    <h1>Secure Location Share</h1>
+    <a href="https://github.com/yourusername/yourrepo" target="_blank" id="github-link" title="View on GitHub">
+      <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" />
+    </a>
+  </header>
+
+  <main class="container">
+    <section class="left-panel">
+      <div class="controls">
+        <button onclick="generateKeys()">Generate QR</button>
+        <button onclick="startQRScanner()">Scan QR</button>
+        <input type="file" accept="image/*" onchange="scanUploadedFile(this)" />
+        <button onclick="startSharing()">Share My Location</button>
+      </div>
+      <div id="qr"></div>
+      <div id="reader"></div>
+    </section>
+    <section class="right-panel">
+      <div id="map"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Secure Location Share | Made with ❤️</p>
+  </footer>
+
   <script src="app.js"></script>
 </body>
 </html>
