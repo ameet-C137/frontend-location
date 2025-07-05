@@ -1,49 +1,49 @@
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+body {
   font-family: Arial, sans-serif;
-  background: linear-gradient(to bottom right, #92fe9d, #00c9ff);
-}
-
-.container {
-  padding: 20px;
-  max-width: 700px;
-  margin: auto;
   text-align: center;
-}
-
-h1 {
-  color: #222;
-}
-
-.controls {
-  background: #ffffffcc;
   padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0,0,0,0.2);
-  margin-bottom: 20px;
+  background-color: #f4f4f9;
+}
+
+#map {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 600px;
+  height: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid #ccc;
 }
 
 button {
   margin: 10px;
   padding: 10px 20px;
   font-size: 16px;
-  background: #0077ff;
+  cursor: pointer;
+  background-color: #007bff;
   color: white;
   border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  border-radius: 5px;
 }
 
 button:hover {
-  background: #005fcc;
+  background-color: #0056b3;
 }
 
-#map {
-  width: 100%;
-  height: 400px;
-  border-radius: 12px;
-  overflow: hidden;
-  margin-top: 10px;
+#peerName {
+  margin: 10px;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+#qr, #reader, #status {
+  margin: 20px auto;
+  max-width: 200px;
+}
+
+#status {
+  font-size: 18px;
+  color: #333;
 }
