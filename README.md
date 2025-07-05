@@ -13,6 +13,7 @@ This app allows two users to share their locations securely using E2EE (ECDH + A
 
 ### Backend
 
+
 ```bash
 cd server
 npm install express ws

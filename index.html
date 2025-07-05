@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Secure Location Sharing</title>
+  <title>Live Location Share</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -10,14 +10,15 @@
 </head>
 <body>
   <div class="container">
-    <h1>Secure Location Sharing</h1>
+    <h1>🔐 Secure Location Share</h1>
     <div class="controls">
-      <button onclick="generateKeys()">Generate QR Code</button>
+      <button onclick="generateKeys()">Generate QR</button>
       <button onclick="startQRScanner()">Scan QR</button>
-      <button onclick="startSharing()">Share Location</button>
+      <input type="file" accept="image/*" onchange="scanUploadedFile(this)" />
+      <button onclick="startSharing()">Share My Location</button>
     </div>
     <div id="qr"></div>
-    <div id="reader" style="width: 300px; margin: auto;"></div>
+    <div id="reader"></div>
     <div id="map"></div>
   </div>
   <script src="app.js"></script>

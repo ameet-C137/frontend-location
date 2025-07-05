@@ -15,89 +15,112 @@ function initMap() {
 }
 
 async function generateKeys() {
-  try {
+  keyPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveKey"]
+  );
+  const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
+
+  const res = await fetch(`${BACKEND_URL}/create-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: b64 }),
+  });
+
+  const data = await res.json();
+  sessionId = data.session;
+
+  document.getElementById("qr").innerHTML = `
+    <img src="https://api.qrserver.com/v1/create-qr-code/?data=${sessionId}&size=150x150" />
+    <p>Scan this QR to connect</p>
+  `;
+}
+
+function startQRScanner() {
+  const reader = new Html5Qrcode("reader");
+  reader.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    async (session) => {
+      reader.stop();
+      await completeKeyExchange(session);
+    }
+  ).catch(err => {
+    alert("Camera error: " + err.message);
+  });
+}
+
+function scanUploadedFile(input) {
+  if (!input.files.length) return;
+  const file = input.files[0];
+  const reader = new Html5Qrcode("reader");
+
+  reader.scanFile(file, true)
+    .then(session => {
+      reader.clear();
+      completeKeyExchange(session);
+    })
+    .catch(err => {
+      alert("Failed to scan QR from image: " + err.message);
+    });
+}
+
+async function completeKeyExchange(session) {
+  sessionId = session;
+  if (!keyPair) {
     keyPair = await crypto.subtle.generateKey(
       { name: "ECDH", namedCurve: "P-256" },
       true,
       ["deriveKey"]
     );
-
-    const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
-
-    const res = await fetch(`${BACKEND_URL}/create-session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: b64 }),
-    });
-
-    if (!res.ok) {
-      alert("❌ Failed to create session.");
-      return;
-    }
-
-    const data = await res.json();
-    sessionId = data.session;
-
-    document.getElementById("qr").innerHTML = `
-      <img src="https://api.qrserver.com/v1/create-qr-code/?data=${sessionId}&size=150x150" />
-      <p>Scan this QR (one-time use)</p>
-    `;
-  } catch (err) {
-    alert("Error generating QR: " + err.message);
   }
-}
 
-function startQRScanner() {
-  const reader = new Html5Qrcode("reader");
-  let scanned = false;
+  const res = await fetch(`${BACKEND_URL}/get-key/${sessionId}`);
+  if (!res.ok) return alert("QR code is expired or invalid");
 
-  reader.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    async (session) => {
-      if (scanned) return;
-      scanned = true;
-      sessionId = session;
-      reader.stop();
-
-      if (!keyPair) {
-        keyPair = await crypto.subtle.generateKey(
-          { name: "ECDH", namedCurve: "P-256" },
-          true, ["deriveKey"]
-        );
-      }
-
-      const res = await fetch(`${BACKEND_URL}/get-key/${sessionId}`);
-      if (!res.ok) return alert("QR expired or invalid");
-
-      const { key } = await res.json();
-      const raw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
-      const publicKey = await crypto.subtle.importKey("raw", raw, { name: "ECDH", namedCurve: "P-256" }, true, []);
-      sharedKey = await crypto.subtle.deriveKey({ name: "ECDH", public: publicKey }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-
-      alert("Key exchange complete. Click Start Sharing.");
-    }
-  );
+  const { key } = await res.json();
+  const raw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+  const publicKey = await crypto.subtle.importKey("raw", raw, { name: "ECDH", namedCurve: "P-256" }, true, []);
+  sharedKey = await crypto.subtle.deriveKey({ name: "ECDH", public: publicKey }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  alert("Key exchange complete. Click Share Location.");
 }
 
 function startSharing() {
-  if (!sessionId) return alert("Create or scan QR first");
+  if (!sessionId) return alert("Please scan or generate QR first.");
 
   const ws = new WebSocket(`${WS_URL}/ws/${sessionId}`);
 
   ws.onopen = () => {
-    navigator.geolocation.watchPosition(pos => {
-      const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-      ws.send(JSON.stringify({ type: "location", coords, username }));
-      updateUserMarker(coords, username);
-    }, err => {
-      alert("Location error: " + err.message);
-    }, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    });
+    navigator.geolocation.watchPosition(
+      pos => {
+        const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        ws.send(JSON.stringify({ type: "location", coords, username }));
+        updateUserMarker(coords, username);
+      },
+      err => {
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            alert("Location access denied. Please allow location.");
+            break;
+          case err.POSITION_UNAVAILABLE:
+            alert("Location unavailable.");
+            break;
+          case err.TIMEOUT:
+            alert("Location request timed out.");
+            break;
+          default:
+            alert("Location error: " + err.message);
+        }
+        console.error("Geo error:", err);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 5000
+      }
+    );
   };
 
   ws.onmessage = ev => {
