@@ -1,27 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
   <title>Secure Location Sharing</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
-  <h1>Secure Location Sharing</h1>
-  <div>
-    <input type="text" id="peerName" placeholder="Enter your name" />
-    <button onclick="generateKeys()">Generate Key & Show QR</button>
-    <button onclick="startQRScanner()">Scan Peer QR</button>
-    <button onclick="uploadQRImage()">Upload QR Image</button>
-    <button onclick="startSharing()">Start Sharing</button>
+  <div class="container">
+    <h1>Secure Location Sharing</h1>
+    <div class="controls">
+      <button onclick="generateKeys()">Generate QR Code</button>
+      <button onclick="startQRScanner()">Scan QR</button>
+      <button onclick="startSharing()">Share Location</button>
+    </div>
+    <div id="qr"></div>
+    <div id="reader" style="width: 300px; margin: auto;"></div>
+    <div id="map"></div>
   </div>
-  <div id="qr"></div>
-  <div id="reader"></div>
-  <div id="status"></div>
-  <div id="map"></div>
+  <script src="app.js"></script>
 </body>
 </html>
