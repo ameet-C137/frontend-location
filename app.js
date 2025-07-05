@@ -15,50 +15,35 @@ function initMap() {
 }
 
 async function generateKeys() {
-  try {
-    keyPair = await crypto.subtle.generateKey(
-      { name: "ECDH", namedCurve: "P-256" },
-      true,
-      ["deriveKey"]
-    );
+  keyPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveKey"]
+  );
+  const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
 
-    const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
+  const res = await fetch(`${BACKEND_URL}/create-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: b64 }),
+  });
 
-    const res = await fetch(`${BACKEND_URL}/create-session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: b64 }),
-    });
+  const data = await res.json();
+  sessionId = data.session;
 
-    if (!res.ok) {
-      alert("❌ Failed to create session.");
-      return;
-    }
-
-    const data = await res.json();
-    sessionId = data.session;
-
-    document.getElementById("qr").innerHTML = `
-      <img src="https://api.qrserver.com/v1/create-qr-code/?data=${sessionId}&size=150x150" />
-      <p>Scan this QR (one-time use)</p>
-    `;
-  } catch (err) {
-    alert("Error generating QR: " + err.message);
-    console.error(err);
-  }
+  document.getElementById("qr").innerHTML = `
+    <img src="https://api.qrserver.com/v1/create-qr-code/?data=${sessionId}&size=150x150" />
+    <p>Scan this QR to connect</p>
+  `;
 }
 
 function startQRScanner() {
   const reader = new Html5Qrcode("reader");
-  let scanned = false;
-
   reader.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
     async (session) => {
-      if (scanned) return;
-      scanned = true;
       reader.stop();
       await completeKeyExchange(session);
     }
@@ -84,7 +69,6 @@ function scanUploadedFile(input) {
 
 async function completeKeyExchange(session) {
   sessionId = session;
-
   if (!keyPair) {
     keyPair = await crypto.subtle.generateKey(
       { name: "ECDH", namedCurve: "P-256" },
@@ -94,17 +78,17 @@ async function completeKeyExchange(session) {
   }
 
   const res = await fetch(`${BACKEND_URL}/get-key/${sessionId}`);
-  if (!res.ok) return alert("QR code is expired or already used.");
+  if (!res.ok) return alert("QR code is expired or invalid");
 
   const { key } = await res.json();
   const raw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
   const publicKey = await crypto.subtle.importKey("raw", raw, { name: "ECDH", namedCurve: "P-256" }, true, []);
   sharedKey = await crypto.subtle.deriveKey({ name: "ECDH", public: publicKey }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-  alert("Key exchange complete. Click 'Share My Location'.");
+  alert("Key exchange complete. Click Share Location.");
 }
 
 function startSharing() {
-  if (!sessionId) return alert("Please create or scan a QR first.");
+  if (!sessionId) return alert("Please scan or generate QR first.");
 
   const ws = new WebSocket(`${WS_URL}/ws/${sessionId}`);
 
@@ -118,16 +102,16 @@ function startSharing() {
       err => {
         switch (err.code) {
           case err.PERMISSION_DENIED:
-            alert("❌ Location access denied. Please enable it.");
+            alert("Location access denied. Please allow location.");
             break;
           case err.POSITION_UNAVAILABLE:
-            alert("❌ Location unavailable.");
+            alert("Location unavailable.");
             break;
           case err.TIMEOUT:
-            alert("❌ Location request timed out.");
+            alert("Location request timed out.");
             break;
           default:
-            alert("❌ Location error: " + err.message);
+            alert("Location error: " + err.message);
         }
         console.error("Geo error:", err);
       },
@@ -146,9 +130,7 @@ function startSharing() {
       peerName = d.username;
       updatePeerMarker(peerCoords, peerName);
       drawRoute();
-
-      alert(`✅ Connected to ${peerName}`);
-      document.getElementById("map-wrapper").classList.add("active");
+      alert(`Connected to ${peerName}`);
     }
   };
 }
@@ -174,7 +156,6 @@ function drawRoute() {
   if (!peerCoords || !userMarker) return;
   const u = userMarker.getLatLng();
   const p = [peerCoords.lat, peerCoords.lon];
-
   fetch(`https://router.project-osrm.org/route/v1/driving/${u.lng},${u.lat};${p[1]},${p[0]}?overview=full&geometries=geojson`)
     .then(r => r.json())
     .then(d => {
