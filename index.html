@@ -11,29 +11,27 @@
 <body>
   <header>
     <h1>Secure Location Share</h1>
-    <a href="https://github.com/yourusername/yourrepo" target="_blank" id="github-link" title="View on GitHub">
+    <a href="https://github.com/ameet-C137" target="_blank" id="github-link" title="View on GitHub">
       <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" />
     </a>
   </header>
 
   <main class="container">
-    <section class="left-panel">
-      <div class="controls">
-        <button onclick="generateKeys()">Generate QR</button>
-        <button onclick="startQRScanner()">Scan QR</button>
-        <input type="file" accept="image/*" onchange="scanUploadedFile(this)" />
-        <button onclick="startSharing()">Share My Location</button>
-      </div>
+    <div class="controls">
+      <button onclick="generateKeys()">Generate QR</button>
+      <button onclick="startQRScanner()">Scan QR</button>
+      <input type="file" accept="image/*" onchange="scanUploadedFile(this)" />
+      <button onclick="startSharing()">Share My Location</button>
       <div id="qr"></div>
       <div id="reader"></div>
-    </section>
-    <section class="right-panel">
+    </div>
+    <div id="map-wrapper">
       <div id="map"></div>
-    </section>
+    </div>
   </main>
 
   <footer>
-    <p>&copy; 2025 Secure Location Share | Made with ❤️</p>
+    <p>&copy; 2025 Secure Location Share</p>
   </footer>
 
   <script src="app.js"></script>
