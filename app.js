@@ -18,28 +18,43 @@ function initMap() {
 
 async function generateKeys() {
   try {
+    // Check secure context
+    if (!window.isSecureContext) {
+      throw new Error("Web Crypto API requires a secure context (HTTPS or localhost)");
+    }
+
+    // Validate peer name
     myName = document.getElementById("peerName").value.trim();
     if (!myName) {
       alert("❌ Please enter your name.");
       return;
     }
 
+    // Generate ECDH key pair
+    if (!window.crypto.subtle) {
+      throw new Error("Web Crypto API not supported in this browser");
+    }
     keyPair = await window.crypto.subtle.generateKey(
       { name: "ECDH", namedCurve: "P-256" },
       true,
       ["deriveKey"]
     );
 
+    // Export public key
     const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
     const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
 
+    // Send to backend
     const res = await fetch(`${BACKEND_URL}/create-session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key: b64, name: myName }),
     });
 
-    if (!res.ok) throw new Error("Failed to create session");
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Backend request failed: ${res.status} ${errorText}`);
+    }
 
     const data = await res.json();
 
@@ -48,8 +63,8 @@ async function generateKeys() {
     `;
     document.getElementById("status").innerText = `QR code generated for ${myName}`;
   } catch (e) {
-    console.error("Key generation failed:", e);
-    alert("❌ Failed to generate keys.");
+    console.error("Key generation failed:", e.message, e.stack);
+    alert(`❌ Failed to generate keys: ${e.message}`);
   }
 }
 
