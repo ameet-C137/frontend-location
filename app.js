@@ -3,7 +3,6 @@ let map, userMarker, peerMarker, routeLine;
 let peerCoords = null;
 let username = prompt("Enter your username:");
 let peerName = "";
-let wsGlobal = null;
 
 const BACKEND_URL = "https://backend-location-bnpl.onrender.com";
 const WS_URL = BACKEND_URL.replace("https", "wss");
@@ -88,7 +87,7 @@ async function completeKeyExchange(session) {
   alert("Key exchange complete. Click Share Location.");
 }
 
-// -------- Secure Username Encryption ----------
+// --- New helper functions to encrypt/decrypt username ---
 async function encryptUsername(plaintext) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
@@ -105,74 +104,57 @@ async function decryptUsername(encrypted) {
   const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
   return new TextDecoder().decode(decrypted);
 }
+// --- End helper functions ---
 
-// -------- Secure Messaging ----------
-async function encryptMessage(msg) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(msg);
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sharedKey, encoded);
-  return {
-    iv: Array.from(iv),
-    message: Array.from(new Uint8Array(ciphertext))
-  };
-}
-
-async function decryptMessage(payload) {
-  const iv = new Uint8Array(payload.iv);
-  const data = new Uint8Array(payload.message);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
-  return new TextDecoder().decode(decrypted);
-}
-
-function appendMessage(text, from = "peer") {
-  const msgBox = document.getElementById("messages");
-  const div = document.createElement("div");
-  div.textContent = (from === "me" ? "🧑‍💻 You: " : `👤 ${peerName || 'Peer'}: `) + text;
-  div.style.marginBottom = "4px";
-  msgBox.appendChild(div);
-  msgBox.scrollTop = msgBox.scrollHeight;
-}
-
-async function sendMessage() {
-  const input = document.getElementById("messageInput");
-  const plainText = input.value.trim();
-  if (!plainText) return;
-  const encrypted = await encryptMessage(plainText);
-  wsGlobal.send(JSON.stringify({ type: "message", ...encrypted }));
-  appendMessage(plainText, "me");
-  input.value = "";
-}
-
-// -------- Sharing and Handling WS --------
 function startSharing() {
   if (!sessionId) return alert("Please scan or generate QR first.");
-  wsGlobal = new WebSocket(`${WS_URL}/ws/${sessionId}`);
 
-  wsGlobal.onopen = () => {
+  const ws = new WebSocket(`${WS_URL}/ws/${sessionId}`);
+
+  ws.onopen = () => {
     navigator.geolocation.watchPosition(
       async pos => {
         const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
         const encryptedName = await encryptUsername(username);
-        wsGlobal.send(JSON.stringify({ type: "location", coords, ...encryptedName }));
+
+        // Send encrypted username inside the location message
+        ws.send(JSON.stringify({ type: "location", coords, ...encryptedName }));
+
         updateUserMarker(coords, username);
       },
-      err => alert("Location error: " + err.message),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      err => {
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            alert("Location access denied. Please allow location.");
+            break;
+          case err.POSITION_UNAVAILABLE:
+            alert("Location unavailable.");
+            break;
+          case err.TIMEOUT:
+            alert("Location request timed out.");
+            break;
+          default:
+            alert("Location error: " + err.message);
+        }
+        console.error("Geo error:", err);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 5000
+      }
     );
   };
 
-  wsGlobal.onmessage = async ev => {
+  ws.onmessage = async ev => {
     try {
       const d = JSON.parse(ev.data);
       if (d.type === "location") {
         peerCoords = d.coords;
-        peerName = await decryptUsername(d);
+        peerName = await decryptUsername(d); // decrypt username from received message
         updatePeerMarker(peerCoords, peerName);
         drawRoute();
-        updateDistance();
-      } else if (d.type === "message") {
-        const text = await decryptMessage(d);
-        appendMessage(text, "peer");
+        alert(`Connected to ${peerName}`);
       }
     } catch (e) {
       console.error("Decryption error:", e);
@@ -209,23 +191,4 @@ function drawRoute() {
         routeLine = L.geoJSON(d.routes[0].geometry, { style: { color: 'blue' } }).addTo(map);
       }
     });
-}
-
-function updateDistance() {
-  if (!peerCoords || !userMarker) return;
-  const u = userMarker.getLatLng();
-  const p = peerCoords;
-
-  const R = 6371e3;
-  const φ1 = u.lat * Math.PI / 180;
-  const φ2 = p.lat * Math.PI / 180;
-  const Δφ = (p.lat - u.lat) * Math.PI / 180;
-  const Δλ = (p.lon - u.lng) * Math.PI / 180;
-
-  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c;
-
-  const distText = d >= 1000 ? `${(d / 1000).toFixed(2)} km` : `${Math.round(d)} m`;
-  document.getElementById("distanceValue").textContent = distText;
 }
