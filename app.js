@@ -87,6 +87,25 @@ async function completeKeyExchange(session) {
   alert("Key exchange complete. Click Share Location.");
 }
 
+// --- New helper functions to encrypt/decrypt username ---
+async function encryptUsername(plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(plaintext);
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sharedKey, encoded);
+  return {
+    iv: Array.from(iv),
+    username: Array.from(new Uint8Array(ciphertext))
+  };
+}
+
+async function decryptUsername(encrypted) {
+  const iv = new Uint8Array(encrypted.iv);
+  const data = new Uint8Array(encrypted.username);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
+  return new TextDecoder().decode(decrypted);
+}
+// --- End helper functions ---
+
 function startSharing() {
   if (!sessionId) return alert("Please scan or generate QR first.");
 
@@ -95,55 +114,52 @@ function startSharing() {
   ws.onopen = () => {
     navigator.geolocation.watchPosition(
       async pos => {
-        const msg = {
-          type: "location",
-          username,
-          coords: { lat: pos.coords.latitude, lon: pos.coords.longitude }
-        };
-        const encrypted = await encrypt(JSON.stringify(msg));
-        ws.send(JSON.stringify(encrypted));
-        updateUserMarker(msg.coords, username);
+        const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        const encryptedName = await encryptUsername(username);
+
+        // Send encrypted username inside the location message
+        ws.send(JSON.stringify({ type: "location", coords, ...encryptedName }));
+
+        updateUserMarker(coords, username);
       },
       err => {
-        alert("Location error: " + err.message);
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            alert("Location access denied. Please allow location.");
+            break;
+          case err.POSITION_UNAVAILABLE:
+            alert("Location unavailable.");
+            break;
+          case err.TIMEOUT:
+            alert("Location request timed out.");
+            break;
+          default:
+            alert("Location error: " + err.message);
+        }
+        console.error("Geo error:", err);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 5000
+      }
     );
   };
 
   ws.onmessage = async ev => {
     try {
-      const encrypted = JSON.parse(ev.data);
-      const decryptedStr = await decrypt(encrypted);
-      const d = JSON.parse(decryptedStr);
-
-      if (d.type === "location" && d.username !== username) {
+      const d = JSON.parse(ev.data);
+      if (d.type === "location") {
         peerCoords = d.coords;
-        peerName = d.username;
+        peerName = await decryptUsername(d); // decrypt username from received message
         updatePeerMarker(peerCoords, peerName);
         drawRoute();
+        alert(`Connected to ${peerName}`);
       }
     } catch (e) {
       console.error("Decryption error:", e);
     }
   };
-}
-
-async function encrypt(plaintext) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(plaintext);
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sharedKey, encoded);
-  return {
-    iv: Array.from(iv),
-    data: Array.from(new Uint8Array(ciphertext))
-  };
-}
-
-async function decrypt(encrypted) {
-  const iv = new Uint8Array(encrypted.iv);
-  const data = new Uint8Array(encrypted.data);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
-  return new TextDecoder().decode(decrypted);
 }
 
 function updateUserMarker(coords, name) {
