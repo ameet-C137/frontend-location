@@ -10,8 +10,8 @@ const WS_URL = BACKEND_URL.replace("https", "wss");
 initMap();
 
 function initMap() {
-  map = L.map('map').setView([0, 0], 2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  map = L.map("map").setView([0, 0], 2);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 }
 
 async function generateKeys() {
@@ -20,6 +20,7 @@ async function generateKeys() {
     true,
     ["deriveKey"]
   );
+
   const publicKeyRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
   const b64 = btoa(String.fromCharCode(...new Uint8Array(publicKeyRaw)));
 
@@ -40,35 +41,40 @@ async function generateKeys() {
 
 function startQRScanner() {
   const reader = new Html5Qrcode("reader");
-  reader.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
-    async (session) => {
-      reader.stop();
-      await completeKeyExchange(session);
-    }
-  ).catch(err => {
-    alert("Camera error: " + err.message);
-  });
+  reader
+    .start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      async (session) => {
+        reader.stop();
+        await completeKeyExchange(session);
+      }
+    )
+    .catch((err) => {
+      alert("Camera error: " + err.message);
+    });
 }
 
 function scanUploadedFile(input) {
   if (!input.files.length) return;
+
   const file = input.files[0];
   const reader = new Html5Qrcode("reader");
 
-  reader.scanFile(file, true)
-    .then(session => {
+  reader
+    .scanFile(file, true)
+    .then((session) => {
       reader.clear();
       completeKeyExchange(session);
     })
-    .catch(err => {
+    .catch((err) => {
       alert("Failed to scan QR from image: " + err.message);
     });
 }
 
 async function completeKeyExchange(session) {
   sessionId = session;
+
   if (!keyPair) {
     keyPair = await crypto.subtle.generateKey(
       { name: "ECDH", namedCurve: "P-256" },
@@ -81,27 +87,51 @@ async function completeKeyExchange(session) {
   if (!res.ok) return alert("QR code is expired or invalid");
 
   const { key } = await res.json();
-  const raw = Uint8Array.from(atob(key), c => c.charCodeAt(0));
-  const publicKey = await crypto.subtle.importKey("raw", raw, { name: "ECDH", namedCurve: "P-256" }, true, []);
-  sharedKey = await crypto.subtle.deriveKey({ name: "ECDH", public: publicKey }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  const raw = Uint8Array.from(atob(key), (c) => c.charCodeAt(0));
+  const publicKey = await crypto.subtle.importKey(
+    "raw",
+    raw,
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    []
+  );
+
+  sharedKey = await crypto.subtle.deriveKey(
+    { name: "ECDH", public: publicKey },
+    keyPair.privateKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+
   alert("Key exchange complete. Click Share Location.");
 }
 
-// --- New helper functions to encrypt/decrypt username ---
+// --- Helper functions to encrypt/decrypt username ---
 async function encryptUsername(plaintext) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sharedKey, encoded);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    sharedKey,
+    encoded
+  );
+
   return {
     iv: Array.from(iv),
-    username: Array.from(new Uint8Array(ciphertext))
+    username: Array.from(new Uint8Array(ciphertext)),
   };
 }
 
 async function decryptUsername(encrypted) {
   const iv = new Uint8Array(encrypted.iv);
   const data = new Uint8Array(encrypted.username);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    sharedKey,
+    data
+  );
+
   return new TextDecoder().decode(decrypted);
 }
 // --- End helper functions ---
@@ -113,16 +143,18 @@ function startSharing() {
 
   ws.onopen = () => {
     navigator.geolocation.watchPosition(
-      async pos => {
-        const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        const encryptedName = await encryptUsername(username);
+      async (pos) => {
+        const coords = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+        };
 
-        // Send encrypted username inside the location message
+        const encryptedName = await encryptUsername(username);
         ws.send(JSON.stringify({ type: "location", coords, ...encryptedName }));
 
         updateUserMarker(coords, username);
       },
-      err => {
+      (err) => {
         switch (err.code) {
           case err.PERMISSION_DENIED:
             alert("Location access denied. Please allow location.");
@@ -136,22 +168,23 @@ function startSharing() {
           default:
             alert("Location error: " + err.message);
         }
+
         console.error("Geo error:", err);
       },
       {
         enableHighAccuracy: true,
         timeout: 15000,
-        maximumAge: 5000
+        maximumAge: 5000,
       }
     );
   };
 
-  ws.onmessage = async ev => {
+  ws.onmessage = async (ev) => {
     try {
       const d = JSON.parse(ev.data);
       if (d.type === "location") {
         peerCoords = d.coords;
-        peerName = await decryptUsername(d); // decrypt username from received message
+        peerName = await decryptUsername(d);
         updatePeerMarker(peerCoords, peerName);
         drawRoute();
         alert(`Connected to ${peerName}`);
@@ -164,15 +197,18 @@ function startSharing() {
 
 function updateUserMarker(coords, name) {
   if (userMarker) map.removeLayer(userMarker);
+
   userMarker = L.marker([coords.lat, coords.lon])
     .addTo(map)
     .bindPopup(name || "You")
     .openPopup();
+
   map.setView([coords.lat, coords.lon], 14);
 }
 
 function updatePeerMarker(coords, name) {
   if (peerMarker) map.removeLayer(peerMarker);
+
   peerMarker = L.marker([coords.lat, coords.lon])
     .addTo(map)
     .bindPopup(name || "Peer")
@@ -181,14 +217,21 @@ function updatePeerMarker(coords, name) {
 
 function drawRoute() {
   if (!peerCoords || !userMarker) return;
+
   const u = userMarker.getLatLng();
   const p = [peerCoords.lat, peerCoords.lon];
-  fetch(`https://router.project-osrm.org/route/v1/driving/${u.lng},${u.lat};${p[1]},${p[0]}?overview=full&geometries=geojson`)
-    .then(r => r.json())
-    .then(d => {
+
+  fetch(
+    `https://router.project-osrm.org/route/v1/driving/${u.lng},${u.lat};${p[1]},${p[0]}?overview=full&geometries=geojson`
+  )
+    .then((r) => r.json())
+    .then((d) => {
       if (routeLine) map.removeLayer(routeLine);
+
       if (d.routes?.[0]?.geometry) {
-        routeLine = L.geoJSON(d.routes[0].geometry, { style: { color: 'blue' } }).addTo(map);
+        routeLine = L.geoJSON(d.routes[0].geometry, {
+          style: { color: "blue" },
+        }).addTo(map);
       }
     });
 }
