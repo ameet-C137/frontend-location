@@ -94,40 +94,33 @@ function startSharing() {
 
   ws.onopen = () => {
     navigator.geolocation.watchPosition(
-      pos => {
+      async pos => {
         const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        ws.send(JSON.stringify({ type: "location", coords, username }));
+        const payload = { coords, username };
+        const encrypted = await encryptPayload(payload);
+        ws.send(JSON.stringify({ type: "encrypted-location", data: encrypted }));
         updateUserMarker(coords, username);
       },
       err => {
         switch (err.code) {
-          case err.PERMISSION_DENIED:
-            alert("Location access denied. Please allow location.");
-            break;
-          case err.POSITION_UNAVAILABLE:
-            alert("Location unavailable.");
-            break;
-          case err.TIMEOUT:
-            alert("Location request timed out.");
-            break;
-          default:
-            alert("Location error: " + err.message);
+          case err.PERMISSION_DENIED: alert("Location access denied."); break;
+          case err.POSITION_UNAVAILABLE: alert("Location unavailable."); break;
+          case err.TIMEOUT: alert("Location request timed out."); break;
+          default: alert("Location error: " + err.message);
         }
-        console.error("Geo error:", err);
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 5000
-      }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
   };
 
-  ws.onmessage = ev => {
+  ws.onmessage = async ev => {
     const d = JSON.parse(ev.data);
-    if (d.type === "location") {
-      peerCoords = d.coords;
-      peerName = d.username;
+    if (d.type === "encrypted-location") {
+      const decrypted = await decryptPayload(d.data);
+      if (!decrypted) return;
+
+      peerCoords = decrypted.coords;
+      peerName = decrypted.username;
       updatePeerMarker(peerCoords, peerName);
       drawRoute();
       alert(`Connected to ${peerName}`);
@@ -135,21 +128,39 @@ function startSharing() {
   };
 }
 
+// AES-GCM Encryption
+async function encryptPayload(obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(JSON.stringify(obj));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sharedKey, encoded);
+  return {
+    iv: Array.from(iv),
+    data: Array.from(new Uint8Array(ciphertext))
+  };
+}
+
+// AES-GCM Decryption
+async function decryptPayload(encrypted) {
+  try {
+    const iv = new Uint8Array(encrypted.iv);
+    const data = new Uint8Array(encrypted.data);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
+    return JSON.parse(new TextDecoder().decode(decrypted));
+  } catch (err) {
+    console.error("Decryption error:", err.message);
+    return null;
+  }
+}
+
 function updateUserMarker(coords, name) {
   if (userMarker) map.removeLayer(userMarker);
-  userMarker = L.marker([coords.lat, coords.lon])
-    .addTo(map)
-    .bindPopup(name || "You")
-    .openPopup();
+  userMarker = L.marker([coords.lat, coords.lon]).addTo(map).bindPopup(name || "You").openPopup();
   map.setView([coords.lat, coords.lon], 14);
 }
 
 function updatePeerMarker(coords, name) {
   if (peerMarker) map.removeLayer(peerMarker);
-  peerMarker = L.marker([coords.lat, coords.lon])
-    .addTo(map)
-    .bindPopup(name || "Peer")
-    .openPopup();
+  peerMarker = L.marker([coords.lat, coords.lon]).addTo(map).bindPopup(name || "Peer").openPopup();
 }
 
 function drawRoute() {
