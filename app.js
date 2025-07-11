@@ -107,25 +107,13 @@ function startSharing() {
       },
       err => {
         switch (err.code) {
-          case err.PERMISSION_DENIED:
-            alert("Location access denied. Please allow location.");
-            break;
-          case err.POSITION_UNAVAILABLE:
-            alert("Location unavailable.");
-            break;
-          case err.TIMEOUT:
-            alert("Location request timed out.");
-            break;
-          default:
-            alert("Location error: " + err.message);
+          case err.PERMISSION_DENIED: alert("Location access denied."); break;
+          case err.POSITION_UNAVAILABLE: alert("Location unavailable."); break;
+          case err.TIMEOUT: alert("Location request timed out."); break;
+          default: alert("Location error: " + err.message);
         }
-        console.error("Geo error:", err);
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 5000
-      }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
   };
 
@@ -133,14 +121,14 @@ function startSharing() {
     try {
       const { data } = JSON.parse(ev.data);
       const decrypted = await decryptPayload(data);
-      if (!decrypted || decrypted.username === username) return;
-      const { coords, username: peer } = decrypted;
-      peerCoords = coords;
-      peerName = peer;
-      updatePeerMarker(coords, peer);
-      drawRoute();
+      if (decrypted?.type === "location" && decrypted.username !== username) {
+        peerCoords = decrypted.coords;
+        peerName = decrypted.username;
+        updatePeerMarker(peerCoords, peerName);
+        drawRoute();
+      }
     } catch (e) {
-      console.error("Invalid message", e);
+      console.error("Decryption failed", e.message);
     }
   };
 }
