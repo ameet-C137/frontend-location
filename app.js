@@ -100,18 +100,12 @@ function startSharing() {
           username,
           coords: { lat: pos.coords.latitude, lon: pos.coords.longitude }
         };
-        const encrypted = await encryptPayload(msg);
-        ws.send(JSON.stringify({ data: encrypted }));
-
+        const encrypted = await encrypt(JSON.stringify(msg));
+        ws.send(JSON.stringify(encrypted));
         updateUserMarker(msg.coords, username);
       },
       err => {
-        switch (err.code) {
-          case err.PERMISSION_DENIED: alert("Location access denied."); break;
-          case err.POSITION_UNAVAILABLE: alert("Location unavailable."); break;
-          case err.TIMEOUT: alert("Location request timed out."); break;
-          default: alert("Location error: " + err.message);
-        }
+        alert("Location error: " + err.message);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     );
@@ -119,24 +113,25 @@ function startSharing() {
 
   ws.onmessage = async ev => {
     try {
-      const { data } = JSON.parse(ev.data);
-      const decrypted = await decryptPayload(data);
-      if (decrypted?.type === "location" && decrypted.username !== username) {
-        peerCoords = decrypted.coords;
-        peerName = decrypted.username;
+      const encrypted = JSON.parse(ev.data);
+      const decryptedStr = await decrypt(encrypted);
+      const d = JSON.parse(decryptedStr);
+
+      if (d.type === "location" && d.username !== username) {
+        peerCoords = d.coords;
+        peerName = d.username;
         updatePeerMarker(peerCoords, peerName);
         drawRoute();
       }
     } catch (e) {
-      console.error("Decryption failed", e.message);
+      console.error("Decryption error:", e);
     }
   };
 }
 
-// AES-GCM Encryption
-async function encryptPayload(obj) {
+async function encrypt(plaintext) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(JSON.stringify(obj));
+  const encoded = new TextEncoder().encode(plaintext);
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sharedKey, encoded);
   return {
     iv: Array.from(iv),
@@ -144,17 +139,11 @@ async function encryptPayload(obj) {
   };
 }
 
-// AES-GCM Decryption
-async function decryptPayload(encrypted) {
-  try {
-    const iv = new Uint8Array(encrypted.iv);
-    const data = new Uint8Array(encrypted.data);
-    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
-    return JSON.parse(new TextDecoder().decode(decrypted));
-  } catch (err) {
-    console.error("Decryption error:", err.message);
-    return null;
-  }
+async function decrypt(encrypted) {
+  const iv = new Uint8Array(encrypted.iv);
+  const data = new Uint8Array(encrypted.data);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
+  return new TextDecoder().decode(decrypted);
 }
 
 function updateUserMarker(coords, name) {
