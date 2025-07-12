@@ -1,88 +1,42 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Secure Location Sharing</title>
-
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-xodZBNTC5n17Xt2vOT+3Peo6QJfn9U1F9v+Dn1y+4zI="
-    crossorigin=""
-  />
-
-  <!-- Style -->
+  <title>Secure Location Share</title>
   <link rel="stylesheet" href="style.css" />
-  
-  <!-- QR scanner -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
-
 <body>
   <header>
     <h1>Secure Location Share</h1>
-    <a id="github-link" href="https://github.com/ameet-C137" target="_blank">
+    <a href="https://github.com/ameet-C137/frontend-location" target="_blank" id="github-link" title="View on GitHub">
       <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" />
     </a>
   </header>
 
-  <div class="container">
-    <div class="left-panel">
+  <main class="container">
+    <section class="left-panel">
       <div class="controls">
-        <h2>Actions</h2>
-        <button onclick="generateKeys()">🔐 Generate QR</button>
-        <button onclick="startQRScanner()">📷 Scan QR</button>
-        <input type="file" id="qr-file" accept="image/*" onchange="uploadQRImage(this)" />
-        <button onclick="startSharing()">📡 Share My Location</button>
-        <div id="qr"></div>
-        <div id="reader" style="width: 100%"></div>
+        <button onclick="generateKeys()">Generate QR</button>
+        <button onclick="startQRScanner()">Scan QR</button>
+        <input type="file" accept="image/*" onchange="scanUploadedFile(this)" />
+        <button onclick="startSharing()">Share My Location</button>
       </div>
-      <textarea id="debug-logs" readonly placeholder="Debug logs..." style="width: 100%; height: 120px; padding: 10px; border-radius: 8px; border: 1px solid #ccc;"></textarea>
-    </div>
-
-    <div class="right-panel">
+      <div id="qr"></div>
+      <div id="reader"></div>
+    </section>
+    <section class="right-panel">
       <div id="map"></div>
-    </div>
-  </div>
+    </section>
+  </main>
 
   <footer>
-    Built with 💜 for Cryptography Assignment by <strong>Ameet</strong> · 
-    <a href="https://github.com/ameet-C137" target="_blank" style="color: #5f2c82;">GitHub</a>
+    <p>&copy; 2025 Secure Location Share</p>
   </footer>
 
-  <!-- Leaflet JS -->
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-pMprNk8fAV0ep0z4vygzGwbBx8KQ1U1UId3QkNnGzFE="
-    crossorigin=""
-  ></script>
-
-  <!-- App Logic -->
   <script src="app.js"></script>
-
-  <!-- QR upload -->
-  <script>
-    function uploadQRImage(input) {
-      const file = input.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function () {
-        const qr = new Html5Qrcode("reader");
-        qr.scanFile(file, true)
-          .then(session => {
-            document.getElementById("reader").innerHTML = "";
-            completeKeyExchange(session);
-          })
-          .catch(err => {
-            alert("QR Scan Failed: " + err.message);
-            document.getElementById("reader").innerHTML = "";
-          });
-      };
-      reader.readAsDataURL(file);
-    }
-  </script>
 </body>
 </html>
