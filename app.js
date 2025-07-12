@@ -87,7 +87,7 @@ async function completeKeyExchange(session) {
   alert("Key exchange complete. Click Share Location.");
 }
 
-
+// --- New helper functions to encrypt/decrypt username ---
 async function encryptUsername(plaintext) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
@@ -104,6 +104,7 @@ async function decryptUsername(encrypted) {
   const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
   return new TextDecoder().decode(decrypted);
 }
+// --- End helper functions ---
 
 function startSharing() {
   if (!sessionId) return alert("Please scan or generate QR first.");
