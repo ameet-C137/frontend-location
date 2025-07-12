@@ -87,25 +87,6 @@ async function completeKeyExchange(session) {
   alert("Key exchange complete. Click Share Location.");
 }
 
-// --- New helper functions to encrypt/decrypt username ---
-async function encryptUsername(plaintext) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(plaintext);
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sharedKey, encoded);
-  return {
-    iv: Array.from(iv),
-    username: Array.from(new Uint8Array(ciphertext))
-  };
-}
-
-async function decryptUsername(encrypted) {
-  const iv = new Uint8Array(encrypted.iv);
-  const data = new Uint8Array(encrypted.username);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sharedKey, data);
-  return new TextDecoder().decode(decrypted);
-}
-// --- End helper functions ---
-
 function startSharing() {
   if (!sessionId) return alert("Please scan or generate QR first.");
 
@@ -113,13 +94,9 @@ function startSharing() {
 
   ws.onopen = () => {
     navigator.geolocation.watchPosition(
-      async pos => {
+      pos => {
         const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        const encryptedName = await encryptUsername(username);
-
-        // Send encrypted username inside the location message
-        ws.send(JSON.stringify({ type: "location", coords, ...encryptedName }));
-
+        ws.send(JSON.stringify({ type: "location", coords, username }));
         updateUserMarker(coords, username);
       },
       err => {
@@ -146,18 +123,14 @@ function startSharing() {
     );
   };
 
-  ws.onmessage = async ev => {
-    try {
-      const d = JSON.parse(ev.data);
-      if (d.type === "location") {
-        peerCoords = d.coords;
-        peerName = await decryptUsername(d); // decrypt username from received message
-        updatePeerMarker(peerCoords, peerName);
-        drawRoute();
-        alert(`Connected to ${peerName}`);
-      }
-    } catch (e) {
-      console.error("Decryption error:", e);
+  ws.onmessage = ev => {
+    const d = JSON.parse(ev.data);
+    if (d.type === "location") {
+      peerCoords = d.coords;
+      peerName = d.username;
+      updatePeerMarker(peerCoords, peerName);
+      drawRoute();
+      alert(`Connected to ${peerName}`);
     }
   };
 }
